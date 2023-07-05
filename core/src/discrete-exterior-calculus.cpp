@@ -41,9 +41,17 @@ namespace surface {
  * Returns: A sparse diagonal matrix representing the Hodge operator that can be applied to discrete 0-forms.
  */
 SparseMatrix<double> VertexPositionGeometry::buildHodgeStar0Form() const {
+    Eigen::SparseMatrix<double> H0(mesh.nVertices(), mesh.nVertices());
+    typedef Eigen::Triplet<double> T;
+    std::vector<T> tl;
+    tl.reserve(mesh.nVertices());
 
-    // TODO
-    return identityMatrix<double>(1); // placeholder
+    for (Vertex v : mesh.vertices()) {
+        tl.push_back(T(v.getIndex(), v.getIndex(), barycentricDualArea(v)));
+    }
+
+    H0.setFromTriplets(tl.begin(), tl.end());
+    return H0;
 }
 
 /*
@@ -53,9 +61,19 @@ SparseMatrix<double> VertexPositionGeometry::buildHodgeStar0Form() const {
  * Returns: A sparse diagonal matrix representing the Hodge operator that can be applied to discrete 1-forms.
  */
 SparseMatrix<double> VertexPositionGeometry::buildHodgeStar1Form() const {
+    Eigen::SparseMatrix<double> H1(mesh.nEdges(), mesh.nEdges());
+    typedef Eigen::Triplet<double> T;
+    std::vector<T> tl;
+    tl.reserve(mesh.nEdges());
 
-    // TODO
-    return identityMatrix<double>(1); // placeholder
+    for (Edge e : mesh.edges()) {
+        // 外心和边长之比
+        tl.push_back(T(e.getIndex(), e.getIndex(),
+                       (halfedgeCotanWeight(e.halfedge()) + halfedgeCotanWeight(e.halfedge().twin()))));
+    }
+
+    H1.setFromTriplets(tl.begin(), tl.end());
+    return H1;
 }
 
 /*
@@ -65,9 +83,17 @@ SparseMatrix<double> VertexPositionGeometry::buildHodgeStar1Form() const {
  * Returns: A sparse diagonal matrix representing the Hodge operator that can be applied to discrete 2-forms.
  */
 SparseMatrix<double> VertexPositionGeometry::buildHodgeStar2Form() const {
+    Eigen::SparseMatrix<double> H2(mesh.nFaces(), mesh.nFaces());
+    typedef Eigen::Triplet<double> T;
+    std::vector<T> tl;
+    tl.reserve(mesh.nFaces());
 
-    // TODO
-    return identityMatrix<double>(1); // placeholder
+    for (Face f : mesh.faces()) {
+        tl.push_back(T(f.getIndex(), f.getIndex(), 1. / faceArea(f)));
+    }
+
+    H2.setFromTriplets(tl.begin(), tl.end());
+    return H2;
 }
 
 /*
@@ -77,9 +103,19 @@ SparseMatrix<double> VertexPositionGeometry::buildHodgeStar2Form() const {
  * Returns: A sparse matrix representing the exterior derivative that can be applied to discrete 0-forms.
  */
 SparseMatrix<double> VertexPositionGeometry::buildExteriorDerivative0Form() const {
+    Eigen::SparseMatrix<double> D0(mesh.nEdges(), mesh.nVertices());
+    typedef Eigen::Triplet<double> T;
+    std::vector<T> tl;
+    tl.reserve(mesh.nEdges() * 2);
 
-    // TODO
-    return identityMatrix<double>(1); // placeholder
+    for (Edge e : mesh.edges()) {
+        size_t idx = e.getIndex();
+        tl.push_back(T(idx, e.firstVertex().getIndex(), -1.0));
+        tl.push_back(T(idx, e.secondVertex().getIndex(), 1.0));
+    }
+
+    D0.setFromTriplets(tl.begin(), tl.end());
+    return D0;
 }
 
 /*
@@ -89,9 +125,27 @@ SparseMatrix<double> VertexPositionGeometry::buildExteriorDerivative0Form() cons
  * Returns: A sparse matrix representing the exterior derivative that can be applied to discrete 1-forms.
  */
 SparseMatrix<double> VertexPositionGeometry::buildExteriorDerivative1Form() const {
+    Eigen::SparseMatrix<double> D1(mesh.nFaces(), mesh.nEdges());
+    typedef Eigen::Triplet<double> T;
+    std::vector<T> tl;
+    tl.reserve(mesh.nFaces() * 3);
 
-    // TODO
-    return identityMatrix<double>(1); // placeholder
+    bool is_oriented;
+    for (Face f : mesh.faces()) {
+        size_t idx = f.getIndex();
+        Halfedge he = f.halfedge();
+        is_oriented = he.tipVertex().getIndex() == he.edge().firstVertex().getIndex();
+        tl.push_back(T(idx, he.edge().getIndex(), is_oriented ? 1 : -1));
+        he = he.next();
+        is_oriented = he.tipVertex().getIndex() == he.edge().firstVertex().getIndex();
+        tl.push_back(T(idx, he.edge().getIndex(), is_oriented ? 1 : -1));
+        he = he.next();
+        is_oriented = he.tipVertex().getIndex() == he.edge().firstVertex().getIndex();
+        tl.push_back(T(idx, he.edge().getIndex(), is_oriented ? 1 : -1));
+    }
+
+    D1.setFromTriplets(tl.begin(), tl.end());
+    return D1;
 }
 
 } // namespace surface
