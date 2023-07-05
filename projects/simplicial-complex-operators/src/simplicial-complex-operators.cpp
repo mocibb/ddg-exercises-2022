@@ -1,5 +1,6 @@
 // Implement member functions for SimplicialComplexOperators class.
 #include "simplicial-complex-operators.h"
+#include <unordered_map>
 
 using namespace geometrycentral;
 using namespace geometrycentral::surface;
@@ -56,12 +57,24 @@ void SimplicialComplexOperators::assignElementIndices() {
  * Returns: The sparse vertex-edge adjacency matrix which gets stored in the global variable A0.
  */
 SparseMatrix<size_t> SimplicialComplexOperators::buildVertexEdgeAdjacencyMatrix() const {
-
-    // TODO
+    geometry->requireVertexIndices();
+    geometry->requireEdgeIndices();
     // Note: You can build an Eigen sparse matrix from triplets, then return it as a Geometry Central SparseMatrix.
     // See <https://eigen.tuxfamily.org/dox/group__TutorialSparse.html> for documentation.
+    Eigen::SparseMatrix<size_t> A0(mesh->nEdges(), mesh->nVertices());
+    typedef Eigen::Triplet<size_t> T;
+    std::vector<T> tl;
+    tl.reserve(mesh->nEdges() * 2);
 
-    return identityMatrix<size_t>(1); // placeholder
+    size_t idx = 0;
+    for (Edge e : mesh->edges()) {
+        idx = geometry->edgeIndices[e];
+        tl.push_back(T(idx, geometry->vertexIndices[e.firstVertex()], 1));
+        tl.push_back(T(idx, geometry->vertexIndices[e.secondVertex()], 1));
+    }
+    A0.setFromTriplets(tl.begin(), tl.end());
+
+    return A0;
 }
 
 /*
@@ -72,8 +85,25 @@ SparseMatrix<size_t> SimplicialComplexOperators::buildVertexEdgeAdjacencyMatrix(
  */
 SparseMatrix<size_t> SimplicialComplexOperators::buildFaceEdgeAdjacencyMatrix() const {
 
-    // TODO
-    return identityMatrix<size_t>(1); // placeholder
+    geometry->requireEdgeIndices();
+    geometry->requireFaceIndices();
+
+    Eigen::SparseMatrix<size_t> A1(mesh->nFaces(), mesh->nEdges());
+    typedef Eigen::Triplet<size_t> T;
+    std::vector<T> tl;
+    tl.reserve(mesh->nFaces() * 2);
+
+    size_t idx = 0;
+    for (Face f : mesh->faces()) {
+        idx = geometry->faceIndices[f];
+        tl.push_back(T(idx, geometry->edgeIndices[f.halfedge().edge()], 1));
+        tl.push_back(T(idx, geometry->edgeIndices[f.halfedge().next().edge()], 1));
+        tl.push_back(T(idx, geometry->edgeIndices[f.halfedge().next().next().edge()], 1));
+        // tl.push_back(T(idx, geometry->edgeIndices[e.secondVertex()], 1));
+    }
+    A1.setFromTriplets(tl.begin(), tl.end());
+
+    return A1;
 }
 
 /*
@@ -83,9 +113,11 @@ SparseMatrix<size_t> SimplicialComplexOperators::buildFaceEdgeAdjacencyMatrix() 
  * Returns: Vector of length |V|, where |V| = # of vertices in the mesh.
  */
 Vector<size_t> SimplicialComplexOperators::buildVertexVector(const MeshSubset& subset) const {
-
-    // TODO
-    return Vector<size_t>::Zero(1);
+    Vector<size_t> vertices = Vector<size_t>::Zero(mesh->nVertices());
+    for (std::set<size_t>::iterator it = subset.vertices.begin(); it != subset.vertices.end(); ++it) {
+        vertices[*it] = 1;
+    }
+    return vertices;
 }
 
 /*
@@ -95,9 +127,11 @@ Vector<size_t> SimplicialComplexOperators::buildVertexVector(const MeshSubset& s
  * Returns: Vector of length |E|, where |E| = # of edges in mesh.
  */
 Vector<size_t> SimplicialComplexOperators::buildEdgeVector(const MeshSubset& subset) const {
-
-    // TODO
-    return Vector<size_t>::Zero(1);
+    Vector<size_t> edges = Vector<size_t>::Zero(mesh->nEdges());
+    for (std::set<size_t>::iterator it = subset.edges.begin(); it != subset.edges.end(); ++it) {
+        edges[*it] = 1;
+    }
+    return edges;
 }
 
 /*
@@ -107,9 +141,11 @@ Vector<size_t> SimplicialComplexOperators::buildEdgeVector(const MeshSubset& sub
  * Returns: Vector of length |F|, where |F| = # of faces in mesh.
  */
 Vector<size_t> SimplicialComplexOperators::buildFaceVector(const MeshSubset& subset) const {
-
-    // TODO
-    return Vector<size_t>::Zero(1);
+    Vector<size_t> faces = Vector<size_t>::Zero(mesh->nFaces());
+    for (std::set<size_t>::iterator it = subset.faces.begin(); it != subset.faces.end(); ++it) {
+        faces[*it] = 1;
+    }
+    return faces;
 }
 
 /*
@@ -119,9 +155,36 @@ Vector<size_t> SimplicialComplexOperators::buildFaceVector(const MeshSubset& sub
  * Returns: The star of the given subset.
  */
 MeshSubset SimplicialComplexOperators::star(const MeshSubset& subset) const {
+    std::set<size_t> vertices;
+    std::set<size_t> edges;
+    std::set<size_t> faces;
 
-    // TODO
-    return subset; // placeholder
+    for (std::set<size_t>::iterator it = subset.vertices.begin(); it != subset.vertices.end(); ++it) {
+        Vertex v = mesh->vertex(*it);
+
+        for (Edge e : v.adjacentEdges()) {
+            edges.insert(e.getIndex());
+        }
+
+        for (Face f : v.adjacentFaces()) {
+            faces.insert(f.getIndex());
+        }
+    }
+
+    for (std::set<size_t>::iterator it = subset.edges.begin(); it != subset.edges.end(); ++it) {
+        Edge e = mesh->edge(*it);
+
+        edges.insert(e.getIndex());
+
+        for (Face f : e.adjacentFaces()) {
+            faces.insert(f.getIndex());
+        }
+    }
+
+    faces.insert(subset.faces.begin(), subset.faces.end());
+
+    MeshSubset stared_subset(subset.vertices, edges, faces);
+    return stared_subset;
 }
 
 
@@ -132,9 +195,27 @@ MeshSubset SimplicialComplexOperators::star(const MeshSubset& subset) const {
  * Returns: The closure of the given subset.
  */
 MeshSubset SimplicialComplexOperators::closure(const MeshSubset& subset) const {
+    std::set<size_t> vertices = subset.vertices;
+    std::set<size_t> edges = subset.edges;
+    std::set<size_t> faces = subset.faces;
 
-    // TODO
-    return subset; // placeholder
+    for (std::set<size_t>::iterator it = faces.begin(); it != faces.end(); ++it) {
+        Face f = mesh->face(*it);
+
+        for (Edge e : f.adjacentEdges()) {
+            edges.insert(e.getIndex());
+        }
+    }
+
+    for (std::set<size_t>::iterator it = edges.begin(); it != edges.end(); ++it) {
+        Edge e = mesh->edge(*it);
+
+        for (Vertex v : e.adjacentVertices()) {
+            vertices.insert(v.getIndex());
+        }
+    }
+
+    return MeshSubset(vertices, edges, faces);
 }
 
 /*
@@ -144,9 +225,12 @@ MeshSubset SimplicialComplexOperators::closure(const MeshSubset& subset) const {
  * Returns: The link of the given subset.
  */
 MeshSubset SimplicialComplexOperators::link(const MeshSubset& subset) const {
+    MeshSubset closured_stared = closure(star(subset));
+    MeshSubset stared_closured = star(closure(subset));
 
-    // TODO
-    return subset; // placeholder
+    closured_stared.deleteSubset(stared_closured);
+
+    return closured_stared;
 }
 
 /*
@@ -156,9 +240,7 @@ MeshSubset SimplicialComplexOperators::link(const MeshSubset& subset) const {
  * Returns: True if given subset is a simplicial complex, false otherwise.
  */
 bool SimplicialComplexOperators::isComplex(const MeshSubset& subset) const {
-
-    // TODO
-    return false; // placeholder
+    return subset.equals(closure(subset));
 }
 
 /*
@@ -169,9 +251,27 @@ bool SimplicialComplexOperators::isComplex(const MeshSubset& subset) const {
  * Returns: int representing the degree of the given complex (-1 if not pure)
  */
 int SimplicialComplexOperators::isPureComplex(const MeshSubset& subset) const {
+    std::set<size_t> vertices;
+    std::set<size_t> edges;
+    std::set<size_t> faces;
+    int degree;
+    MeshSubset closured_subset;
 
-    // TODO
-    return -1; // placeholder
+    if (!subset.faces.empty()) {
+        faces.insert(subset.faces.begin(), subset.faces.end());
+        degree = 2;
+    } else if (!subset.edges.empty()) {
+        edges.insert(subset.edges.begin(), subset.edges.end());
+        degree = 1;
+    } else {
+        vertices.insert(subset.vertices.begin(), subset.vertices.end());
+        degree = 0;
+    }
+
+    closured_subset = MeshSubset(vertices, edges, faces);
+    bool is_pure_complex = subset.equals(closure(closured_subset));
+
+    return !is_pure_complex ? -1 : degree;
 }
 
 /*
@@ -181,7 +281,54 @@ int SimplicialComplexOperators::isPureComplex(const MeshSubset& subset) const {
  * Returns: The boundary of the given subset.
  */
 MeshSubset SimplicialComplexOperators::boundary(const MeshSubset& subset) const {
+    std::set<size_t> faces;
+    std::set<size_t> edges;
+    std::set<size_t> vertices;
 
-    // TODO
-    return subset; // placeholder
+    if (!subset.faces.empty()) {
+        std::unordered_map<size_t, int> edges_map;
+        for (std::set<size_t>::iterator it = subset.faces.begin(); it != subset.faces.end(); ++it) {
+            Face f = mesh->face(*it);
+
+            for (Edge e : f.adjacentEdges()) {
+                if (edges_map.count(e.getIndex()) > 0) {
+                    edges_map[e.getIndex()]++;
+                } else {
+                    edges_map[e.getIndex()] = 1;
+                }
+            }
+        }
+
+        for (auto elem : edges_map) {
+            if (elem.second == 1) {
+                Edge e = mesh->edge(elem.first);
+                edges.insert(elem.first);
+                vertices.insert(e.firstVertex().getIndex());
+                vertices.insert(e.secondVertex().getIndex());
+            }
+        }
+    }
+
+    if (!subset.edges.empty()) {
+        std::unordered_map<size_t, int> vertices_map;
+        for (std::set<size_t>::iterator it = subset.edges.begin(); it != subset.edges.end(); ++it) {
+            Edge e = mesh->edge(*it);
+
+            for (Vertex v : e.adjacentVertices()) {
+                if (vertices_map.count(v.getIndex()) > 0) {
+                    vertices_map[v.getIndex()]++;
+                } else {
+                    vertices_map[v.getIndex()] = 1;
+                }
+            }
+        }
+
+        for (auto elem : vertices_map) {
+            if (elem.second == 1) {
+                vertices.insert(elem.first);
+            }
+        }
+    }
+
+    return MeshSubset(vertices, edges, faces);
 }
