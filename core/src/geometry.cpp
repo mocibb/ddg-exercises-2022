@@ -52,7 +52,7 @@ double VertexPositionGeometry::meanEdgeLength() const {
 
     double total = 0.0;
     for (Edge e : mesh.edges()) {
-        total += edgeLength(e);
+        total +=  edgeLength(e);
     }
     return total / mesh.nEdges();
 }
