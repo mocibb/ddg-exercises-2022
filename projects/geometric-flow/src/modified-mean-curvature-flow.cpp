@@ -11,7 +11,7 @@ ModifiedMeanCurvatureFlow::ModifiedMeanCurvatureFlow(ManifoldSurfaceMesh* inputM
     geometry = inputGeo;
 
     // TODO: build the Laplace matrix
-    this->A = geometry->laplaceMatrix() + identityMatrix<double>(mesh->nVertices())*1e-8;
+    this->A = geometry->laplaceMatrix();
 }
 
 /*

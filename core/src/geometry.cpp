@@ -373,7 +373,7 @@ std::pair<double, double> VertexPositionGeometry::principalCurvatures(Vertex v) 
 SparseMatrix<double> VertexPositionGeometry::laplaceMatrix() const {
     SparseMatrix<double> d0(buildExteriorDerivative0Form());
     SparseMatrix<double> star1(buildHodgeStar1Form());
-    return d0.transpose()*star1*d0;
+    return d0.transpose()*star1*d0 + identityMatrix<double>(mesh.nVertices())*1e-8;
 }
 
 /*
@@ -394,9 +394,10 @@ SparseMatrix<double> VertexPositionGeometry::massMatrix() const {
  * Returns: Sparse complex positive definite Laplace matrix for the mesh.
  */
 SparseMatrix<std::complex<double>> VertexPositionGeometry::complexLaplaceMatrix() const {
-
+    SparseMatrix<std::complex<double>> A = identityMatrix<std::complex<double>>(mesh.nVertices())*1e-8;
+    
     // TODO
-    return identityMatrix<std::complex<double>>(1); // placeholder
+    return A; // placeholder
 }
 
 /*

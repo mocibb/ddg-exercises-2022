@@ -20,7 +20,7 @@ MeanCurvatureFlow::MeanCurvatureFlow(ManifoldSurfaceMesh* inputMesh, VertexPosit
  * Returns: A sparse matrix representing the mean curvature flow operator.
  */
 SparseMatrix<double> MeanCurvatureFlow::buildFlowOperator(const SparseMatrix<double>& M, double h) const {
-    SparseMatrix<double> A = geometry->laplaceMatrix() + identityMatrix<double>(mesh->nVertices())*1e-8;
+    SparseMatrix<double> A = geometry->laplaceMatrix();
     return M+h*A;
 }
 

@@ -30,7 +30,7 @@ Vector<double> ScalarPoissonProblem::solve(const Vector<double>& rho) const {
     // TODO
     // Note: Geometry Central has linear solvers: https://geometry-central.net/numerical/linear_solvers/
     
-    SparseMatrix<double> A = this->A + identityMatrix<double>(this->A.rows())*1e-8;
+    SparseMatrix<double> A = this->A;
 
     double rhoBar = 0;
     for (Eigen::Index i = 0; i < rho.rows(); i++) {
