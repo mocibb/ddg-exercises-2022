@@ -394,10 +394,22 @@ SparseMatrix<double> VertexPositionGeometry::massMatrix() const {
  * Returns: Sparse complex positive definite Laplace matrix for the mesh.
  */
 SparseMatrix<std::complex<double>> VertexPositionGeometry::complexLaplaceMatrix() const {
-    SparseMatrix<std::complex<double>> A = identityMatrix<std::complex<double>>(mesh.nVertices())*1e-8;
-    
-    // TODO
-    return A; // placeholder
+    SparseMatrix<double> laplace = laplaceMatrix();
+
+    SparseMatrix<std::complex<double>> A(laplace.rows(), laplace.cols());
+
+    std::vector<Eigen::Triplet<std::complex<double>>> triplets;
+
+    for (int k = 0; k < laplace.outerSize(); ++k) {
+        for (typename SparseMatrix<double>::InnerIterator it(laplace, k); it; ++it) {
+            triplets.emplace_back(it.row(), it.col(), std::complex<double>(it.value(), 0));
+        }
+    }
+
+    A.setFromTriplets(triplets.begin(), triplets.end());
+    A.makeCompressed();
+
+    return A;
 }
 
 /*

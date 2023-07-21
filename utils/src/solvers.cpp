@@ -1,4 +1,5 @@
 #include "solvers.h"
+#include "geometrycentral/numerical/linear_solvers.h"
 
 /*
  * Compute the inverse of a sparse diagonal matrix.
@@ -26,9 +27,9 @@ SparseMatrix<double> sparseInverseDiagonal(SparseMatrix<double>& M) {
  * Returns: The residual
  */
 double residual(const SparseMatrix<std::complex<double>>& A, const Vector<std::complex<double>>& x) {
+    std::complex<double> lambda = x.adjoint()*A*x;
 
-    // TODO
-    return 0; // placeholder
+    return (A*x-lambda*x).norm();
 }
 
 /*
@@ -38,7 +39,20 @@ double residual(const SparseMatrix<std::complex<double>>& A, const Vector<std::c
  * Returns: The smallest eigenvector of A.
  */
 Vector<std::complex<double>> solveInversePowerMethod(const SparseMatrix<std::complex<double>>& A) {
+    Vector<std::complex<double>> x = Vector<std::complex<double>>::Random(A.rows());
+    x /= x.norm();
+    SparseMatrix<std::complex<double>> B = A;
+    geometrycentral::SquareSolver<std::complex<double>> solver(B);
 
-    // TODO
-    return Vector<std::complex<double>>::Zero(1);
+    Vector<std::complex<double>> u = x;
+
+    const double epsilon = 1e-9;
+    while (residual(B, u) > epsilon) {
+        solver.solve(x, u);
+        x.array() -= x.mean();
+        x /= x.norm();
+        u = x;
+    }
+
+    return x;
 }
