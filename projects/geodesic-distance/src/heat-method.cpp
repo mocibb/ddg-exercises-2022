@@ -69,6 +69,25 @@ Vector<double> HeatMethod::computeDivergence(const FaceData<Vector3>& X) const {
     return div; // placeholder
 }
 
+// 根据1-form实现
+// Vector<double> HeatMethod::computeDivergence(const FaceData<Vector3>& X) const {
+//     std::cout << "HeatMethod::computeDivergence2" << std::endl;
+//     Vector<double> w = Vector<double>::Zero(mesh->nEdges());
+//     for (Face f : mesh->faces()) {
+//         Vector3 Xj = X[f.getIndex()];
+//         for (Halfedge he : f.adjacentHalfedges()) {
+//             // 1-form跟边（不是半边）的定向有关系
+//             Vector3 Xe = geometry->inputVertexPositions[he.edge().firstVertex()] - geometry->inputVertexPositions[he.edge().secondVertex()];
+//             w[he.edge().getIndex()] += dot(Xe, Xj);
+//         }
+//     }
+
+//     SparseMatrix<double> star1(geometry->buildHodgeStar1Form());
+//     SparseMatrix<double> d(geometry->buildExteriorDerivative0Form());
+//     Vector<double> div = d.transpose() * star1 * w;
+//     return div;
+// }
+
 /*
  * Computes the geodesic distances φ using the heat method.
  *
