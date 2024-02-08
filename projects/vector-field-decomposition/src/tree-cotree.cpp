@@ -1,12 +1,12 @@
 // Implement member functions for TreeCotree class.
 #include "tree-cotree.h"
+#include <queue>
 
 /*
  * Constructor
  * Input: The surface mesh <inputMesh> and geometry <inputGeo>.
  */
 TreeCotree::TreeCotree(ManifoldSurfaceMesh* inputMesh, VertexPositionGeometry* inputGeo) {
-
     mesh = inputMesh;
     geometry = inputGeo;
 }
@@ -20,8 +20,30 @@ TreeCotree::TreeCotree(ManifoldSurfaceMesh* inputMesh, VertexPositionGeometry* i
  * Returns:
  */
 void TreeCotree::buildPrimalSpanningTree() {
+    std::queue<Vertex> queue;
+    Vertex root = mesh->vertex(randomInt(0, mesh->nVertices()));
 
-    // TODO
+    // 从某个顶点开始
+    queue.push(root);
+    vertexParent.emplace(root, root);
+    std::cout << "root = " << root.getIndex() << std::endl;
+
+    while(!queue.empty()) {
+        auto v = queue.front();
+        queue.pop();
+
+        for (Halfedge he : v.outgoingHalfedges()) { 
+            // do not cross edges in T*
+            if (inDualSpanningCotree(he)) {
+                continue;
+            }       
+            Vertex w = he.tipVertex();
+            if (!vertexParent.count(w)) {
+                vertexParent.emplace(w, v);
+                queue.push(w);
+            }
+        }
+    }
 }
 
 /*
@@ -31,9 +53,22 @@ void TreeCotree::buildPrimalSpanningTree() {
  * Returns: True if <he> is in the primal spanning tree, false otherwise.
  */
 bool TreeCotree::inPrimalSpanningTree(Halfedge he) {
+    Vertex v = he.tailVertex();
+    Vertex w = he.tipVertex();
 
-    // TODO
-    return false; // placeholder
+    if (vertexParent.count(v)) {
+        if (vertexParent[v] == w) {
+            return true;
+        }
+    }
+
+    if (vertexParent.count(w)) {
+        if (vertexParent[w] == v) {
+            return true;
+        }
+    } 
+
+    return false;
 }
 
 /*
@@ -44,8 +79,27 @@ bool TreeCotree::inPrimalSpanningTree(Halfedge he) {
  * Returns:
  */
 void TreeCotree::buildDualSpanningCoTree() {
+    std::queue<Face> queue;
+    Face root = mesh->face(randomInt(0, mesh->nFaces()));
 
-    // TODO
+    // 从某个顶点开始
+    queue.push(root);
+    faceParent[root] = root;
+
+    while(!queue.empty()) {
+        auto f = queue.front();
+        queue.pop();
+
+        for (Halfedge he : f.adjacentHalfedges()) {
+            //不考虑带边界情况
+            Face g = he.twin().face();
+
+            if (!faceParent.count(g)) {
+                faceParent[g] = f;
+                queue.push(g);
+            }
+        }
+    }
 }
 
 /*
@@ -55,9 +109,21 @@ void TreeCotree::buildDualSpanningCoTree() {
  * Returns: True if <he> is in the dual spanning tree, false otherwise.
  */
 bool TreeCotree::inDualSpanningCotree(Halfedge he) {
+    Face f = he.face();
+    Face g = he.twin().face();
 
-    // TODO
-    return false; // placeholder
+    if (faceParent.count(f)) {
+        if (faceParent[f] == g) {
+            return true;
+        }
+    }
+
+    if (faceParent.count(g)) {
+        if (faceParent[g] == f) {
+            return true;
+        }
+    }    
+    return false;
 }
 
 /*
@@ -85,10 +151,53 @@ Halfedge TreeCotree::sharedHalfedge(Face f, Face g) const {
  * Returns:
  */
 void TreeCotree::buildGenerators() {
-
-    // order doesn't matter in a mesh without boundary
-    buildPrimalSpanningTree();
+    // 1. 计算对偶Mesh的Spanning Tree
     buildDualSpanningCoTree();
+    buildPrimalSpanningTree();
 
-    // TODO: Build generators and populate this->generators
+
+    // 2. Build generators and populate this->generators
+    // loop throught each dual edge    
+    for (const auto& e : mesh->edges()) {
+        Halfedge he = e.halfedge();
+        if (!inDualSpanningCotree(he) && !inPrimalSpanningTree(he)) {
+            Vertex v1 = he.tipVertex();
+            Vertex v2 = he.tailVertex();
+
+            generators.push_back(std::vector<Halfedge>());
+            // v2 -> v1
+            generators.back().push_back(he);
+            
+            // v1 -> root
+            Vertex v1p = vertexParent.at(v1);
+            while(v1p != v1) {
+                for (Halfedge he1 : v1.outgoingHalfedges()) {
+                    if (he1.tipVertex() == v1p) {
+                        generators.back().push_back(he1);
+                        break;
+                    }
+                }
+                v1 = v1p;
+                v1p = vertexParent.at(v1);
+            }
+            // root -> v2
+            std::vector<Halfedge> backward;
+            Vertex v2p = vertexParent.at(v2);
+            while(v2p != v2) {
+                for (Halfedge he2 : v2.incomingHalfedges()) {
+                    if (he2.tailVertex() == v2p) {
+                        backward.push_back(he2);
+                        break;
+                    }
+                }
+                v2 = v2p;
+                v2p = vertexParent.at(v2);
+            }
+            
+            generators.back().insert(generators.back().end(), backward.rbegin(), backward.rend());
+        }
+    }
+
+    std::cout << "generators.size() = " << generators.size() << std::endl;
+
 }
