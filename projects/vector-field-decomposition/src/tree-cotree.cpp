@@ -21,12 +21,11 @@ TreeCotree::TreeCotree(ManifoldSurfaceMesh* inputMesh, VertexPositionGeometry* i
  */
 void TreeCotree::buildPrimalSpanningTree() {
     std::queue<Vertex> queue;
-    Vertex root = mesh->vertex(randomInt(0, mesh->nVertices()));
+    Vertex root = *(mesh->vertices().begin());
 
     // 从某个顶点开始
     queue.push(root);
     vertexParent.emplace(root, root);
-    std::cout << "root = " << root.getIndex() << std::endl;
 
     while(!queue.empty()) {
         auto v = queue.front();
@@ -34,9 +33,9 @@ void TreeCotree::buildPrimalSpanningTree() {
 
         for (Halfedge he : v.outgoingHalfedges()) { 
             // do not cross edges in T*
-            if (inDualSpanningCotree(he)) {
-                continue;
-            }       
+            // if (inDualSpanningCotree(he)) {
+            //     continue;
+            // }       
             Vertex w = he.tipVertex();
             if (!vertexParent.count(w)) {
                 vertexParent.emplace(w, v);
@@ -80,7 +79,7 @@ bool TreeCotree::inPrimalSpanningTree(Halfedge he) {
  */
 void TreeCotree::buildDualSpanningCoTree() {
     std::queue<Face> queue;
-    Face root = mesh->face(randomInt(0, mesh->nFaces()));
+    Face root = *(mesh->faces().begin());
 
     // 从某个顶点开始
     queue.push(root);
@@ -88,12 +87,15 @@ void TreeCotree::buildDualSpanningCoTree() {
 
     while(!queue.empty()) {
         auto f = queue.front();
-        queue.pop();
+        queue.pop();       
 
         for (Halfedge he : f.adjacentHalfedges()) {
+            if (inPrimalSpanningTree(he)) {
+                continue;
+            }
+            
             //不考虑带边界情况
             Face g = he.twin().face();
-
             if (!faceParent.count(g)) {
                 faceParent[g] = f;
                 queue.push(g);
@@ -152,49 +154,54 @@ Halfedge TreeCotree::sharedHalfedge(Face f, Face g) const {
  */
 void TreeCotree::buildGenerators() {
     // 1. 计算对偶Mesh的Spanning Tree
-    buildDualSpanningCoTree();
     buildPrimalSpanningTree();
+    buildDualSpanningCoTree();
 
 
     // 2. Build generators and populate this->generators
     // loop throught each dual edge    
+    // 计算对偶网络的生成元
     for (const auto& e : mesh->edges()) {
         Halfedge he = e.halfedge();
+        //if (!inDualSpanningCotree(he) && !inPrimalSpanningTree(he)) {
         if (!inDualSpanningCotree(he) && !inPrimalSpanningTree(he)) {
-            Vertex v1 = he.tipVertex();
-            Vertex v2 = he.tailVertex();
+            Face f1 = he.face();
+            Face f2 = he.twin().face();
+
+            std::cout << "f1 = " << f1.getIndex() << ", f2 = " << f2.getIndex() << std::endl;
 
             generators.push_back(std::vector<Halfedge>());
-            // v2 -> v1
-            generators.back().push_back(he);
+            std::vector<Halfedge>& generator = generators.back();
+            // f2 -> f1 -> root -> f2
+            // f2 -> f1
+            generator.push_back(he);
             
-            // v1 -> root
-            Vertex v1p = vertexParent.at(v1);
-            while(v1p != v1) {
-                for (Halfedge he1 : v1.outgoingHalfedges()) {
-                    if (he1.tipVertex() == v1p) {
-                        generators.back().push_back(he1);
-                        break;
-                    }
-                }
-                v1 = v1p;
-                v1p = vertexParent.at(v1);
+            // f1 -> root
+            Face f1p = faceParent.at(f1);
+            while(f1p != f1) {
+                generator.push_back(sharedHalfedge(f1p, f1));
+                f1 = f1p;
+                f1p = faceParent.at(f1);
             }
-            // root -> v2
+            
+            // root -> f2
             std::vector<Halfedge> backward;
-            Vertex v2p = vertexParent.at(v2);
-            while(v2p != v2) {
-                for (Halfedge he2 : v2.incomingHalfedges()) {
-                    if (he2.tailVertex() == v2p) {
-                        backward.push_back(he2);
-                        break;
-                    }
+            Face f2p = faceParent.at(f2);
+            while(f2p != f2) {
+                Halfedge he1 = sharedHalfedge(f2p, f2);
+                // 从f2到root时可能提前遇到loop点
+                auto it = std::find(generator.begin(), generator.end(), he1);
+                if (it != generator.end()) {
+                    generator.erase(it, generator.end());
+                    break;
                 }
-                v2 = v2p;
-                v2p = vertexParent.at(v2);
+                backward.push_back(sharedHalfedge(f2, f2p));
+                f2 = f2p;
+                f2p = faceParent.at(f2);
             }
             
-            generators.back().insert(generators.back().end(), backward.rbegin(), backward.rend());
+            generator.insert(generator.end(), backward.rbegin(), backward.rend());
+            
         }
     }
 

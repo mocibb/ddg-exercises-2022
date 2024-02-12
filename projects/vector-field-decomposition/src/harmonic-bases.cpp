@@ -18,10 +18,16 @@ HarmonicBases::HarmonicBases(ManifoldSurfaceMesh* inputMesh, VertexPositionGeome
  * Returns: A vector representing a closed primal 1-form.
  */
 Vector<double> HarmonicBases::buildClosedPrimalOneForm(const std::vector<Halfedge>& generator) const {
+    Vector<double> omega = Vector<double>::Zero(mesh->nEdges());
 
-    // TODO
-    return Vector<double>::Zero(1); // placeholder
+    // generator from twin --> face
+    for (Halfedge he : generator) {
+        bool is_oriented = he.tipVertex().getIndex() == he.edge().firstVertex().getIndex();
+        omega[he.edge().getIndex()] = is_oriented ? 1 : -1;
+    }
+    return omega;
 }
+
 
 /*
  * Compute the harmonic bases [γ1, γ2 ... γn] of the input mesh.
@@ -32,7 +38,13 @@ Vector<double> HarmonicBases::buildClosedPrimalOneForm(const std::vector<Halfedg
 std::vector<Vector<double>> HarmonicBases::compute(const std::vector<std::vector<Halfedge>>& generators,
                                                    const HodgeDecomposition& hodgeDecomposition) const {
 
-    // TODO
     std::vector<Vector<double>> gammas;
-    return gammas; // placeholder
+ 
+    for (size_t i = 0; i < generators.size(); i++) {
+        const auto omega = buildClosedPrimalOneForm(generators[i]);
+        const auto dAlpha = hodgeDecomposition.computeExactComponent(omega);
+        gammas.push_back(omega - dAlpha);
+    }
+    
+    return gammas;
 }
