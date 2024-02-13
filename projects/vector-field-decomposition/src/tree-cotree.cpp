@@ -168,8 +168,6 @@ void TreeCotree::buildGenerators() {
             Face f1 = he.face();
             Face f2 = he.twin().face();
 
-            std::cout << "f1 = " << f1.getIndex() << ", f2 = " << f2.getIndex() << std::endl;
-
             generators.push_back(std::vector<Halfedge>());
             std::vector<Halfedge>& generator = generators.back();
             // f2 -> f1 -> root -> f2
@@ -204,7 +202,4 @@ void TreeCotree::buildGenerators() {
             
         }
     }
-
-    std::cout << "generators.size() = " << generators.size() << std::endl;
-
 }

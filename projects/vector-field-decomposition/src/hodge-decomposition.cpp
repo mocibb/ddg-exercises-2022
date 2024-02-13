@@ -25,22 +25,20 @@ HodgeDecomposition::HodgeDecomposition(ManifoldSurfaceMesh* inputMesh, VertexPos
     // Hint: Use the sparseInverseDiagonal() in utils/src/solvers.cpp to invert sparse diagonal matrices.
     // dual 1-form to primal 1-form
     this->hodge1Inv = sparseInverseDiagonal(this->hodge1);
-    // SparseMatrix<double> II = (hodge1Inv*hodge1);
-    // std::cout << II.diagonal() << std::endl;
     // dual 2-form to primal 0-form
     this->hodge2Inv = sparseInverseDiagonal(this->hodge2);
-    // dual 0-form to dual 1-form
-    this->d0T = this->d1.transpose();
     // dual 1-form to dual 2-form
-    this->d1T = this->d0.transpose();
+    this->d0T = this->d0.transpose();
+    // dual 0-form to dual 1-form
+    this->d1T = this->d1.transpose();
     
     // Construct 0-form Laplace matrix.
     // Shift matrix by a small constant (1e-8) to make it positive definite.
-    this->A = d1T*hodge1*d0 + identityMatrix<double>(mesh->nVertices())*1e-8;
+    this->A = d0T*hodge1*d0 + identityMatrix<double>(mesh->nVertices())*1e-8;
 
     // Construct 2-form matrix.
-    // 为了保持对称可以使用PositiveDefiniteSolver
-    this->B = d1*hodge1Inv*d0T;
+    // 输入为dual 0-form，去掉星是为了保持对称，可以使用PositiveDefiniteSolver
+    this->B = d1*hodge1Inv*d1T;
 }
 
 /*
@@ -52,7 +50,7 @@ HodgeDecomposition::HodgeDecomposition(ManifoldSurfaceMesh* inputMesh, VertexPos
 Vector<double> HodgeDecomposition::computeExactComponent(const Vector<double>& omega) const {
     SparseMatrix<double> A = this->A;
     PositiveDefiniteSolver<double> solver(A);
-    Vector<double> alpha = solver.solve(d1T*hodge1*omega);
+    Vector<double> alpha = solver.solve(d0T*hodge1*omega);
     return this->d0*alpha;
 }
 
@@ -67,7 +65,7 @@ Vector<double> HodgeDecomposition::computeCoExactComponent(const Vector<double>&
     PositiveDefiniteSolver<double> solver(B);
     // B = d*d 求出来的是*beta
     Vector<double> beta = solver.solve(d1*omega);
-    return hodge1Inv*d0T*beta;
+    return hodge1Inv*d1T*beta;
 }
 
 /*
