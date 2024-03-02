@@ -1,5 +1,9 @@
 // Implement member functions for TrivialConnections class.
 #include "trivial-connections.h"
+#include "tree-cotree.h"
+#include "harmonic-bases.h"
+#include "hodge-decomposition.h"
+#include "geometrycentral/numerical/linear_solvers.h"
 
 /*
  * Constructor
@@ -10,16 +14,22 @@ TrivialConnections::TrivialConnections(ManifoldSurfaceMesh* inputMesh, VertexPos
     mesh = inputMesh;
     geometry = inputGeo;
 
-    // TODO: Build harmonic bases
-    this->bases; // placeholder;
+    // Build harmonic bases
+    TreeCotree treeCotree(mesh, geometry);
+    treeCotree.buildGenerators();
+    HodgeDecomposition hodgeDecomposition(mesh, geometry);
+    HarmonicBases harmonicBases(mesh, geometry);
+    
+    this->generators = treeCotree.generators;
+    this->bases = harmonicBases.compute(generators, hodgeDecomposition);
 
     // Build period matrix.
     this->P = this->buildPeriodMatrix();
 
-    // TODO: Store DEC operators
-    this->A = identityMatrix<double>(1);      // placeholder
-    this->hodge1 = identityMatrix<double>(1); // placeholder
-    this->d0 = identityMatrix<double>(1);     // placeholder
+    // Store DEC operators
+    this->A = hodgeDecomposition.A;
+    this->hodge1 = hodgeDecomposition.hodge1;
+    this->d0 = hodgeDecomposition.d0;
 }
 
 /*
@@ -30,8 +40,21 @@ TrivialConnections::TrivialConnections(ManifoldSurfaceMesh* inputMesh, VertexPos
  * Returns: A sparse matrix represending the period matrix.
  */
 SparseMatrix<double> TrivialConnections::buildPeriodMatrix() const {
-    // TODO
-    return identityMatrix<double>(1); // placeholder
+    // genus x 2
+    int g2 = this->bases.size();
+    SparseMatrix<double> P(g2, g2);    
+
+    for (size_t i = 0; i < this->generators.size(); i++) {
+        for (size_t j = 0; j < this->bases.size(); j++) {
+            double v = 0;
+            for (Halfedge he: this->generators[i]) {
+                v += (he == he.edge().halfedge() ? 1 : -1) * this->bases[j][he.edge().getIndex()];
+            }
+            
+            P.coeffRef(i, j) = v;
+        }
+    }
+    return P;
 }
 
 /*
@@ -52,9 +75,15 @@ bool TrivialConnections::satsifyGaussBonnet(const Vector<double>& singularity) c
  * Returns: The coexact component 𝛿β.
  */
 Vector<double> TrivialConnections::computeCoExactComponent(const Vector<double>& singularity) const {
+    Vector<double> u = Vector<double>::Zero(mesh->nVertices());
+    for (Vertex v : mesh->vertices()) {
+        auto idx = v.getIndex();
+        u[idx] = -geometry->angleDefect(v) + 2*PI*singularity[idx];
+    }
 
-    // TODO
-    return Vector<double>::Zero(1); // placeholder
+    SparseMatrix<double> A = this->A;
+    Vector<double> betaTilde = solvePositiveDefinite(A, u);
+    return this->hodge1*this->d0*betaTilde;
 }
 
 
@@ -94,9 +123,41 @@ double TrivialConnections::transportNoRotation(Halfedge he, double alphaI) const
  * Returns: The harmonic component γ.
  */
 Vector<double> TrivialConnections::computeHarmonicComponent(const Vector<double>& deltaBeta) const {
+    Vector<double> gamma = Vector<double>::Zero(mesh->nEdges());
 
-    // TODO
-    return Vector<double>::Zero(1); // placeholder
+    if (this->bases.size() > 0) {
+        Vector<double> vtilde(this->generators.size());
+        for (size_t i = 0; i < this->generators.size(); i++) {
+            double sum = 0;
+            for (Halfedge he: this->generators[i]) {
+                sum += transportNoRotation(he, 0);
+                sum -= (he == he.edge().halfedge() ? 1 : -1) * deltaBeta[he.edge().getIndex()];
+            }
+            vtilde[i] = sum - 2*PI*floor(sum / (2*PI));
+        }
+
+        SparseMatrix<double> P = this->P;
+        
+        Vector<double> z = solveSquare(P, vtilde);
+        
+        SparseMatrix<double> d1 = geometry->buildExteriorDerivative1Form();
+        SparseMatrix<double> hodge1 = geometry->buildHodgeStar1Form();
+        SparseMatrix<double> d0T = geometry->buildExteriorDerivative0Form().transpose();
+        for (size_t i = 0; i < this->bases.size(); i++) {
+            gamma += z[i] * bases[i];
+            // check
+            Vector<double> dGamma = d1 * bases[i];
+            Vector<double> deltaGamma = d0T * hodge1 * bases[i];
+            if (dGamma.norm() > 1e-5) {
+                std::cout << "dGamma.norm() = " << dGamma.norm() << std::endl;
+            }
+            if (deltaGamma.norm() > 1e-5) {
+                std::cout << "deltaGamma.norm() = " << deltaGamma.norm() << std::endl;
+            }
+        }
+    }
+    
+    return gamma;
 }
 
 /*
@@ -111,6 +172,9 @@ Vector<double> TrivialConnections::computeConnections(const Vector<double>& sing
         std::cerr << "Singularities do not add up to the Euler characteristic of the mesh" << std::endl;
         return Vector<double>::Zero(mesh->nEdges());
     }
-    // TODO: Compute connections on topological spheres
-    return Vector<double>::Zero(1); // placeholder
+
+    Vector<double> deltaBeta = computeCoExactComponent(singularity);
+    Vector<double> gamma = computeHarmonicComponent(-deltaBeta);
+    return deltaBeta + gamma;
 }
+

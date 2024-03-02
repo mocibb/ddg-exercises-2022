@@ -107,7 +107,7 @@ void updateDirectionField(const Vector<double>& phi, bool display) {
                 double sign = he.edge().halfedge() == he ? 1 : -1;
                 faceParent[g] = f;
                 double connection = sign * phi[he.edge().getIndex()];
-                alpha[g] = connections.transportNoRotation(he, alpha[f] - connection);
+                alpha[g] = connections.transportNoRotation(he, alpha[f] + connection);
                 bag.push_back(g);
             }
         }
