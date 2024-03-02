@@ -22,7 +22,7 @@ Vector<double> HarmonicBases::buildClosedPrimalOneForm(const std::vector<Halfedg
 
     // generator from twin --> face
     for (Halfedge he : generator) {
-        bool is_oriented = he.tipVertex().getIndex() == he.edge().firstVertex().getIndex();
+        bool is_oriented = (he == he.edge().halfedge());
         omega[he.edge().getIndex()] = is_oriented ? 1 : -1;
     }
     return omega;
