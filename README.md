@@ -18,6 +18,8 @@
 
 通过这门课既可以学习到有趣的几何处理算法，也能通过实验摸到现代数学的门槛，包括代数拓扑，黎曼几何，Hodge定理等。
 
+当然这里面最核心的是离散微分形式，微分形式的语言已经深深地影响到现代的数学和物理，通过离散微分几何学习微分形式是最佳的路径。
+
 这门课是学习DDG最好的资源，Keenan Crane教授从2016年就开始把授课内容放到网上方便大家学习，这里对Keenan Crane教授表示由衷的感谢。
 
 除了这门课还有一些优秀的学习资源可以参考，感谢各位教授的无私奉献。
@@ -25,6 +27,14 @@
 - 这里有SIGGRAPH中历次介绍DDG的笔记，可以从最新的看起 http://ddg.cs.columbia.edu/
 - UCSD Albert Chern教授的[CSE 270](https://cseweb.ucsd.edu/~alchern/teaching/cse270_wi24/)，Albert Chern教授的Houdini真是出神入化，Slide也非常漂亮
 - MIT Justin Solomon教授的[6.8410](https://groups.csail.mit.edu/gdpgroup/68410_spring_2023.html)，Justin Solomon教授的课程有视频，数学推导炉火纯青
+
+## 在线体验版本
+   [geometry-processing-js](https://geometrycollective.github.io/geometry-processing-js/)
+
+   ![image](https://github.com/mocibb/ddg-exercises-2022/assets/18642/f0b13a39-61fa-4285-9879-8f56456d3acd)
+  包括平均曲率流，离散曲率和法向，计算测地线的热核算法，共形参数化方法，向量场的Hodge分解，求解曲面上的Poisson方程，离散微分形式，最后是设计向量场的平直联络算法。
+   
+
 
 ## 如何跑通第一个DDG例子。
 1. 克隆这个项目，注意这个项目里面有子模组，需要使用--recursive选项。projects里面就是需要完成的作业，我们用geodesic-distance作为例子。
