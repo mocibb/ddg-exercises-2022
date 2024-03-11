@@ -1,5 +1,10 @@
 # ddg-exercises
 
+## 更新
+在wiki中陆续加入作业速通的笔记 [作业速通](https://github.com/mocibb/ddg-exercises-2022/wiki/%E4%BD%9C%E4%B8%9A%E9%80%9F%E9%80%9A)
+
+## 正文
+
 这个项目是Keenan Crane教授在CMU开设的离散微分几何的作业的答案。2022年的课程的主页在[Discrete Differential Geometry](https://brickisland.net/DDGSpring2022/) (15-458/858). 
 
 这门课程主要介绍了几何处理相关的数学工具，用这些工具完成有意思的实验。
