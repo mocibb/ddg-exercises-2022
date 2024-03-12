@@ -36,7 +36,7 @@
 ## 在线体验版本
   Keenan Crane教授在网上公开了这门课作业的在线体验版本 [geometry-processing-js](https://geometrycollective.github.io/geometry-processing-js/)
 
-   ![image](https://github.com/mocibb/ddg-exercises-2022/assets/18642/f0b13a39-61fa-4285-9879-8f56456d3acd)
+   <img src="https://github.com/mocibb/ddg-exercises-2022/assets/18642/f0b13a39-61fa-4285-9879-8f56456d3acd" width="640">
   包括平均曲率流，离散曲率和法向，计算测地线的热核算法，共形参数化方法，向量场的Hodge分解，求解曲面上的Poisson方程，离散微分形式，最后是设计向量场的平直联络算法。
    
 
@@ -58,9 +58,9 @@ make -j4
 ```
 bin/main
 ```
-![image](https://github.com/mocibb/ddg-exercises-2022/assets/18642/5ec1c0cc-4192-40b6-8c3e-a000aaee2167)
+<img src="https://github.com/mocibb/ddg-exercises-2022/assets/18642/5ec1c0cc-4192-40b6-8c3e-a000aaee2167" width="640">
 
-![image](https://github.com/mocibb/ddg-exercises-2022/assets/18642/186035e8-86eb-4f6c-af56-d78fe73449b9)
+<img src="https://github.com/mocibb/ddg-exercises-2022/assets/18642/186035e8-86eb-4f6c-af56-d78fe73449b9" width="640">
 
 
 ## License
