@@ -1,9 +1,24 @@
 // Implement member functions for SimplicialComplexOperators class.
 #include "simplicial-complex-operators.h"
 #include <unordered_map>
+#include <chrono>
+
+// #define USE_SPARSE_MATRIX
+#define MEASURE_PERFORMANCE
 
 using namespace geometrycentral;
 using namespace geometrycentral::surface;
+
+#ifdef MEASURE_PERFORMANCE
+    void report_elapsed_time(const std::chrono::time_point<std::chrono::steady_clock>& start, const std::string& msg) {
+        auto elapsed = std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::steady_clock::now() - start);
+        std::cout << msg << " = " << elapsed.count() << "ms\n";
+    }
+#else
+    void report_elapsed_time(std::chrono::time_point<clock_t, duration_t> const& start, std::string msg) {
+
+    }
+#endif
 
 /*
  * Assign a unique index to each vertex, edge, and face of a mesh.
@@ -22,17 +37,33 @@ void SimplicialComplexOperators::assignElementIndices() {
 
     // You can set the index field of a vertex via geometry->vertexIndices[v], where v is a Vertex object (or an
     // integer). Similarly you can do edges and faces via geometry->edgeIndices, geometry->faceIndices, like so:
+    // 随机设置index
+    auto perm = [](int N) {
+        std::vector<int> v(N);
+        std::iota(std::begin(v), std::end(v), 0);
+        unsigned seed = std::chrono::system_clock::now().time_since_epoch().count();
+        std::shuffle (v.begin(), v.end(), std::default_random_engine(seed));
+
+        return v;
+    };
+
     size_t idx = 0;
+    auto vIndex = perm(mesh->nVertices());
+    int i = 0;
     for (Vertex v : mesh->vertices()) {
-        idx = geometry->vertexIndices[v];
+        // geometry->vertexIndices[v] = vIndex[i++];
     }
 
+    auto eIndex = perm(mesh->nEdges());
+    i = 0;
     for (Edge e : mesh->edges()) {
-        idx = geometry->edgeIndices[e];
+        // geometry->edgeIndices[e] = eIndex[i++];
     }
 
+    auto fIndex = perm(mesh->nFaces());
+    i = 0;
     for (Face f : mesh->faces()) {
-        idx = geometry->faceIndices[f];
+        // geometry->faceIndices[f] = fIndex[i++];
     }
 
     // You can more easily get the indices of mesh elements using the function getIndex(), albeit less efficiently and
@@ -91,7 +122,7 @@ SparseMatrix<size_t> SimplicialComplexOperators::buildFaceEdgeAdjacencyMatrix() 
     Eigen::SparseMatrix<size_t> A1(mesh->nFaces(), mesh->nEdges());
     typedef Eigen::Triplet<size_t> T;
     std::vector<T> tl;
-    tl.reserve(mesh->nFaces() * 2);
+    tl.reserve(mesh->nFaces() * 3);
 
     size_t idx = 0;
     for (Face f : mesh->faces()) {
@@ -99,7 +130,6 @@ SparseMatrix<size_t> SimplicialComplexOperators::buildFaceEdgeAdjacencyMatrix() 
         tl.push_back(T(idx, geometry->edgeIndices[f.halfedge().edge()], 1));
         tl.push_back(T(idx, geometry->edgeIndices[f.halfedge().next().edge()], 1));
         tl.push_back(T(idx, geometry->edgeIndices[f.halfedge().next().next().edge()], 1));
-        // tl.push_back(T(idx, geometry->edgeIndices[e.secondVertex()], 1));
     }
     A1.setFromTriplets(tl.begin(), tl.end());
 
@@ -114,8 +144,8 @@ SparseMatrix<size_t> SimplicialComplexOperators::buildFaceEdgeAdjacencyMatrix() 
  */
 Vector<size_t> SimplicialComplexOperators::buildVertexVector(const MeshSubset& subset) const {
     Vector<size_t> vertices = Vector<size_t>::Zero(mesh->nVertices());
-    for (std::set<size_t>::iterator it = subset.vertices.begin(); it != subset.vertices.end(); ++it) {
-        vertices[*it] = 1;
+    for (size_t idx : subset.vertices) {
+        vertices[idx] = 1;
     }
     return vertices;
 }
@@ -128,8 +158,8 @@ Vector<size_t> SimplicialComplexOperators::buildVertexVector(const MeshSubset& s
  */
 Vector<size_t> SimplicialComplexOperators::buildEdgeVector(const MeshSubset& subset) const {
     Vector<size_t> edges = Vector<size_t>::Zero(mesh->nEdges());
-    for (std::set<size_t>::iterator it = subset.edges.begin(); it != subset.edges.end(); ++it) {
-        edges[*it] = 1;
+    for (size_t idx : subset.edges) {
+        edges[idx] = 1;
     }
     return edges;
 }
@@ -142,8 +172,8 @@ Vector<size_t> SimplicialComplexOperators::buildEdgeVector(const MeshSubset& sub
  */
 Vector<size_t> SimplicialComplexOperators::buildFaceVector(const MeshSubset& subset) const {
     Vector<size_t> faces = Vector<size_t>::Zero(mesh->nFaces());
-    for (std::set<size_t>::iterator it = subset.faces.begin(); it != subset.faces.end(); ++it) {
-        faces[*it] = 1;
+    for (size_t idx : subset.faces) {
+        faces[idx] = 1;
     }
     return faces;
 }
@@ -155,36 +185,38 @@ Vector<size_t> SimplicialComplexOperators::buildFaceVector(const MeshSubset& sub
  * Returns: The star of the given subset.
  */
 MeshSubset SimplicialComplexOperators::star(const MeshSubset& subset) const {
-    std::set<size_t> vertices;
-    std::set<size_t> edges;
-    std::set<size_t> faces;
+    auto start = std::chrono::steady_clock::now();
+#ifdef USE_SPARSE_MATRIX
+    MeshSubset stared_subset = subset.deepCopy();
+    stared_subset.addEdges(copyFromVector(this->A0*this->buildVertexVector(stared_subset)));
+    stared_subset.addFaces(copyFromVector(this->A1*this->buildEdgeVector(stared_subset)));
 
-    for (std::set<size_t>::iterator it = subset.vertices.begin(); it != subset.vertices.end(); ++it) {
-        Vertex v = mesh->vertex(*it);
+    report_elapsed_time(start, "star");
+    return stared_subset;
+#else
+    std::set<size_t> vertices = subset.vertices;
+    std::set<size_t> edges = subset.edges;
+    std::set<size_t> faces = subset.faces;
+
+    for (size_t vid : vertices) {
+        const Vertex v = mesh->vertex(vid);
 
         for (Edge e : v.adjacentEdges()) {
             edges.insert(e.getIndex());
         }
-
-        for (Face f : v.adjacentFaces()) {
-            faces.insert(f.getIndex());
-        }
     }
 
-    for (std::set<size_t>::iterator it = subset.edges.begin(); it != subset.edges.end(); ++it) {
-        Edge e = mesh->edge(*it);
-
-        edges.insert(e.getIndex());
+    for (size_t eid : edges) {
+        const Edge e = mesh->edge(eid);
 
         for (Face f : e.adjacentFaces()) {
             faces.insert(f.getIndex());
         }
     }
 
-    faces.insert(subset.faces.begin(), subset.faces.end());
-
-    MeshSubset stared_subset(subset.vertices, edges, faces);
-    return stared_subset;
+    report_elapsed_time(start, "star");
+    return MeshSubset(vertices, edges, faces);
+#endif
 }
 
 
@@ -195,27 +227,38 @@ MeshSubset SimplicialComplexOperators::star(const MeshSubset& subset) const {
  * Returns: The closure of the given subset.
  */
 MeshSubset SimplicialComplexOperators::closure(const MeshSubset& subset) const {
+    auto start = std::chrono::steady_clock::now();
+#ifdef USE_SPARSE_MATRIX   
+    MeshSubset closured_subset = subset.deepCopy();
+    closured_subset.addEdges(copyFromVector(this->A1.transpose()*this->buildFaceVector(closured_subset)));
+    closured_subset.addVertices(copyFromVector(this->A0.transpose()*this->buildEdgeVector(closured_subset)));
+
+    report_elapsed_time(start, "closure");
+    return closured_subset;
+#else 
     std::set<size_t> vertices = subset.vertices;
     std::set<size_t> edges = subset.edges;
     std::set<size_t> faces = subset.faces;
 
-    for (std::set<size_t>::iterator it = faces.begin(); it != faces.end(); ++it) {
-        Face f = mesh->face(*it);
+    for (size_t fid : faces) {
+        const Face f = mesh->face(fid);
 
         for (Edge e : f.adjacentEdges()) {
             edges.insert(e.getIndex());
         }
     }
 
-    for (std::set<size_t>::iterator it = edges.begin(); it != edges.end(); ++it) {
-        Edge e = mesh->edge(*it);
+    for (size_t eid : edges) {
+        const Edge e = mesh->edge(eid);
 
         for (Vertex v : e.adjacentVertices()) {
             vertices.insert(v.getIndex());
         }
     }
 
+    report_elapsed_time(start, "closure");
     return MeshSubset(vertices, edges, faces);
+#endif
 }
 
 /*
@@ -225,11 +268,13 @@ MeshSubset SimplicialComplexOperators::closure(const MeshSubset& subset) const {
  * Returns: The link of the given subset.
  */
 MeshSubset SimplicialComplexOperators::link(const MeshSubset& subset) const {
+    auto start = std::chrono::steady_clock::now();
     MeshSubset closured_stared = closure(star(subset));
     MeshSubset stared_closured = star(closure(subset));
 
     closured_stared.deleteSubset(stared_closured);
 
+    report_elapsed_time(start, "link");
     return closured_stared;
 }
 
@@ -281,14 +326,43 @@ int SimplicialComplexOperators::isPureComplex(const MeshSubset& subset) const {
  * Returns: The boundary of the given subset.
  */
 MeshSubset SimplicialComplexOperators::boundary(const MeshSubset& subset) const {
+    auto start = std::chrono::steady_clock::now();
+#ifdef USE_SPARSE_MATRIX  
+    MeshSubset boundary_subset;
+
+    if (!subset.faces.empty()) {
+        Vector<size_t> edgeVector = this->A1.transpose()*this->buildFaceVector(subset);
+        for (size_t idx = 0; idx < (size_t)edgeVector.size(); idx++) {
+            if (edgeVector[idx] == 1) {
+                boundary_subset.addEdge(idx);
+                Edge e = mesh->edge(idx);
+                boundary_subset.addVertex(e.firstVertex().getIndex());
+                boundary_subset.addVertex(e.secondVertex().getIndex());
+            }
+        }
+    }
+
+    if (!subset.edges.empty()) {
+        Vector<size_t> vertexVector = this->A0.transpose()*this->buildEdgeVector(subset);
+        for (size_t idx = 0; idx < (size_t)vertexVector.size(); idx++) {
+            if (vertexVector[idx] == 1) {
+                boundary_subset.addVertex(idx);
+            }
+        }
+    }
+
+    report_elapsed_time(start, "boundary");
+    return boundary_subset;
+#else    
     std::set<size_t> faces;
     std::set<size_t> edges;
     std::set<size_t> vertices;
 
     if (!subset.faces.empty()) {
         std::unordered_map<size_t, int> edges_map;
-        for (std::set<size_t>::iterator it = subset.faces.begin(); it != subset.faces.end(); ++it) {
-            Face f = mesh->face(*it);
+        
+        for (size_t fid : subset.faces) {
+            const Face f = mesh->face(fid);
 
             for (Edge e : f.adjacentEdges()) {
                 if (edges_map.count(e.getIndex()) > 0) {
@@ -329,6 +403,7 @@ MeshSubset SimplicialComplexOperators::boundary(const MeshSubset& subset) const 
             }
         }
     }
-
+    report_elapsed_time(start, "boundary");
     return MeshSubset(vertices, edges, faces);
+#endif
 }

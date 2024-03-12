@@ -21,6 +21,7 @@ class SimplicialComplexOperators {
     SimplicialComplexOperators(ManifoldSurfaceMesh* inputMesh, VertexPositionGeometry* inputGeo) {
         mesh = inputMesh;
         geometry = inputGeo;
+        // this->assignElementIndices();
         A0 = this->buildVertexEdgeAdjacencyMatrix();
         A1 = this->buildFaceEdgeAdjacencyMatrix();
     }
@@ -29,6 +30,7 @@ class SimplicialComplexOperators {
     void initialize(ManifoldSurfaceMesh* M, VertexPositionGeometry* G) {
         mesh = M;
         geometry = G;
+        // this->assignElementIndices();
         A0 = this->buildVertexEdgeAdjacencyMatrix();
         A1 = this->buildFaceEdgeAdjacencyMatrix();
     }
@@ -37,6 +39,17 @@ class SimplicialComplexOperators {
     ~SimplicialComplexOperators() {
         delete mesh;
         delete geometry;
+    }
+
+    inline std::set<size_t> copyFromVector(Vector<size_t> v) const {
+        std::set<size_t> ss;
+        for (size_t idx = 0; idx < (size_t)v.size(); idx++) {
+            if (v[idx]) {
+                ss.insert(idx);
+            }
+        }
+
+        return ss;
     }
 
     // Operators
